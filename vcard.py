@@ -5,7 +5,6 @@ import re
 
 from file_utils import read_txt_file
 
-
 # ----------------------------------------------------------------------------------------------------
 # Configuration
 # ----------------------------------------------------------------------------------------------------
@@ -17,6 +16,14 @@ filename = "google_contacts.csv"
 # ----------------------------------------------------------------------------------------------------
 # Supporting Functions
 # ----------------------------------------------------------------------------------------------------
+
+CYAN = "\033[36m"
+RESET = "\033[0m"
+RED = "\033[31m"
+YELLOW = "\033[33m"
+GREEN = "\033[32m"
+BLUE = "\033[34m"
+MAGENTA = "\033[35m"
 
 
 class Contact:
@@ -44,7 +51,7 @@ class Contact:
             "email_work": getattr(self, "email_work", None),
             "email_school": getattr(self, "email_school", None),
             "phone_home": getattr(self, "phone_home", None),
-            "phone_work": getattr(self, "phone_work", None),    
+            "phone_work": getattr(self, "phone_work", None),
         }
 
     def __str__(self):
@@ -54,33 +61,51 @@ class Contact:
 
 class vCard(Contact):
 
+    @staticmethod
+    def extract_key(_key_str):
+        if _key_str in ["BEGIN", "END", "VERSION", "N", "FN", "PRODID", "REV"]:
+            return _key_str
+        elif _key_str.startswith("PHOTO") or _key_str.startswith("BDAY"):
+            return _key_str
+        elif matches := re.match(r"^(item\d+)", _key_str):
+            return matches.group(1)
+        raise ValueError(f"Unrecognized key: {_key_str}")
+
     def __init__(self, _lines):
         print("# =========================================")
         accumulator_key = None
         accumulator_value = None
         for _line in _lines:
-            # print(f"# {_line}")
-            if not _line.startswith(" "):
-                matches = re.match(r"^(.+):(.+)$", _line)
-                if matches:
-                    key = matches.groups()[0]
-                    value = matches.groups()[1]
-                    if accumulator_key is not None:
-                        print(f"KEY1: {accumulator_key} VALUE: {accumulator_value}")
-                        accumulator_key = None
-                        accumulator_value = None
-                    if key.startswith("PHOTO") or key.startswith("item"):
-                        accumulator_key = key
-                        accumulator_value = [value]
-                    else:
-                        print(f"KEY2: {key} VALUE: {value}")
+            print("\n>> ", _line)
+            matches = re.match(r"^(.+):(.+)$", _line)
+            if matches:
+                key_str = matches.groups()[0]
+                value = matches.groups()[1]
+                key = vCard.extract_key(key_str)
+                print(f"KEY0: {key_str}=>{key} VALUE: {value}")
             else:
-                accumulator_value.append( _line.strip())
+                print(f"NO MATCH: {_line}")
+            # # print(f"# {_line}")
+            # if accumulator_key is None:
+            #     if accumulator_key is not None:
+            #         print(f"KEY1: {accumulator_key} VALUE: {accumulator_value}")
+            #         accumulator_key = None
+            #         accumulator_value = None
+            #     if key.startswith("PHOTO") or key.startswith("item"):
+            #         accumulator_key = key
+            #         accumulator_value = [value]
+            #     else:
+            #         print(f"KEY2: {key} VALUE: {value}")
+            # else:
+            #     if accumulator_value is not None:
+            #         accumulator_value.append(_line.strip())
 
-            # if _line.startswith("VERSION:"):
-            #     self.full_name = _line[3:]
-            # elif _line.startswith("N:"):
-            #     self.family_name, self.given_name, self.middle_name, self.prefix, self.suffix = _line[2:].split(";")
+            # # if _line.startswith("VERSION:"):
+            # #     self.full_name = _line[3:]
+            # # elif _line.startswith("N:"):
+            # #     self.family_name, self.given_name, self.middle_name, self.prefix, self.suffix = _line[2:].split(";")
+
+
 #         items = {}
 #         for line in _lines:
 #             if line.startswith("FN:"):
@@ -100,7 +125,7 @@ class vCard(Contact):
 #                     print("HERE")
 #                     print(repr(self))
 
-        
+
 #         vCard.vcards.append(self)
 
 #     def process_item(self, item_lines):
@@ -128,7 +153,6 @@ class vCard(Contact):
 #         # return super().__str__() + "\n" + "vCard: " + self.given_name + " " + self.family_name
 
 
-
 class vCards:
 
     def __init__(self, _filename):
@@ -138,13 +162,17 @@ class vCards:
 
     def split_records_lines(self) -> int:
         lines = None
+        if self.lines is None:
+            return 0
         for line in self.lines:
             if line == "BEGIN:VCARD":
                 lines = []
                 lines.append(line)
             elif line == "END:VCARD":
                 if lines is None:
-                    raise ValueError("Error: END:VCARD found without a corresponding BEGIN:VCARD")
+                    raise ValueError(
+                        "Error: END:VCARD found without a corresponding BEGIN:VCARD"
+                    )
                 elif lines == []:
                     raise ValueError("Error: END:VCARD immediately after BEGIN:VCARD")
                 else:
@@ -177,10 +205,50 @@ class vCards:
 # ----------------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    vcards = vCards(in_file)
-    num_records = vcards.split_records_lines()
-    print(f"Number of records: {num_records}")
-    vcards.process_records_lines()
-    # print(vcards)
-    # vcards.process_record_lines()
+    # vcards = vCards(in_file)
+    # num_records = vcards.split_records_lines()
+    # print(f"Number of records: {num_records}")
+    # vcards.process_records_lines()
+    # # print(vcards)
+    # # vcards.process_record_lines()
 
+    lines = read_txt_file(in_file)
+
+    records = []
+    record = None
+    current_key = None
+    # lines = read_txt_file(in_file)
+    for line in lines:
+        # qline = re.sub(r"([\n]+)", r"\\n", re.sub(r"([\r]+)", r"\\r", line))
+        print(f"\n{CYAN}>>{line}{RESET}")
+        if re.match(r"^\s*$", line):
+            continue
+        elif line == "BEGIN:VCARD":
+            record = {}
+        elif line == "END:VCARD":
+            records.append(record)
+            record = None
+        elif line.startswith(" "):
+            if record is not None and current_key is not None:
+                record[current_key][-1] += line[1:]
+                print(
+                    f"{MAGENTA}>> Continuation for key: {current_key} = {record[current_key][-1]}{RESET}"
+                )
+                # break
+        elif matches := re.match(r"^([^:]+):(.+)", line):
+            key, value = matches.groups()
+            if record is None:
+                print(
+                    f"{RED}!! Record is None when trying to add key: {key}, value: {value}{RESET}"
+                )
+                raise ValueError(
+                    f"Record is None when trying to add key: {key}, value: {value}"
+                )
+            record[key] = [value]
+            current_key = key
+        else:
+            print(f"{YELLOW}!! Unrecognized line: {line}{RESET}")
+
+    print("# -----------------------------------------------")
+    print(f"{CYAN}Parsed records:{RESET}")
+    print(json.dumps(records, indent=4))
